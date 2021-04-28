@@ -1,0 +1,81 @@
+---
+
+- apt:
+    name: ["unzip"]
+    state: present
+    install_recommends: no
+
+- get_url:
+    url: "https://releases.hashicorp.com/nomad/{{ nomad_version}}/nomad_{{ nomad_version }}_linux_amd64.zip"
+    dest: "/tmp/nomad_{{ nomad_version }}_linux_amd64.zip"
+    mode: 0644
+    checksum: "sha256:https://releases.hashicorp.com/nomad/{{ nomad_version }}/nomad_{{ nomad_version }}_SHA256SUMS"
+
+- unarchive:
+    src: "/tmp/nomad_{{ nomad_version }}_linux_amd64.zip"
+    dest: /usr/local/bin/
+    remote_src: yes
+    owner: root
+    group: root
+    mode: 0755
+
+- group:
+    name: "{{ nomad_group }}"
+    state: present
+    system: yes
+
+- user:
+    name: "{{ nomad_user }}"
+    state: present
+    group: "{{ nomad_group }}"
+    system: yes
+
+- file:
+    name: "{{ nomad_config_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: 0755
+
+- file:
+    name: "{{ item }}"
+    state: directory
+    owner: "{{ nomad_user }}"
+    group: "{{ nomad_group }}"
+    mode: 0755
+  loop:
+    - "{{ nomad_data_dir }}"
+    - "{{ nomad_data_dir }}/plugins"
+
+- template:
+    src: client.hcl.j2
+    dest: "{{ nomad_config_dir }}/client.hcl"
+    owner: root
+    group: root
+    mode: 0644
+  notify:
+  - restart nomad
+
+- template:
+    src: extras.hcl.j2
+    dest: "{{ nomad_config_dir }}/extras.hcl"
+    owner: root
+    group: root
+    mode: 0644
+  notify:
+  - restart nomad
+
+- template:
+    src: nomad.service.j2
+    dest: /lib/systemd/system/nomad.service
+    owner: root
+    group: root
+    mode: 0644
+
+- systemd:
+    daemon_reload: true
+
+- service:
+    name: nomad
+    enabled: true
+    state: started
